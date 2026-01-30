@@ -6,7 +6,7 @@ import time
 from PIL import Image
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from Zero.utils.decorators import AdminRights
+from Banword.helpers.admin import AdminRights
 from Banword.database.client import (
     set_nsfw_status, 
     get_nsfw_status, 
