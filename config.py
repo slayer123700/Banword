@@ -14,7 +14,8 @@ BOT_USERNAME = os.environ.get("BOT_USERNAME", "Rion_xbot")
 # -----------------------------------------------
 
 OWNER_ID = int(os.environ.get("OWNER_ID", "6018803920"))
-SPECIAL_ID = int(os.environ.get("SPECIAL_ID", "6018803920))
+SPECIAL_ID = int(os.environ.get("SPECIAL_ID", 6018803920))
+
 # ------------------------------------------------
 
 # ------------------------------------------------
