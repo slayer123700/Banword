@@ -1,6 +1,7 @@
 import asyncio
 from pyrogram import filters
 from pyrogram.types import Message
+from Banword import app
 
 # chat_id : delete_after_seconds
 AUTO_DELETE_TIME = {}
@@ -10,7 +11,7 @@ AUTO_DELETE_TIME = {}
 # Set auto-delete time
 # /setdel <seconds>
 # ==============================
-@filters.command("setdel") & filters.group
+@app.on_message(filters.command("setdel") & filters.group)
 async def set_auto_delete(client, message: Message):
     if not message.from_user:
         return
@@ -43,7 +44,7 @@ async def set_auto_delete(client, message: Message):
 # Disable auto-delete
 # /deldisable
 # ==============================
-@filters.command("deldisable") & filters.group
+@app.on_message(filters.command("deldisable") & filters.group)
 async def disable_auto_delete(client, message: Message):
     if not message.from_user:
         return
@@ -60,19 +61,17 @@ async def disable_auto_delete(client, message: Message):
 
 
 # ==============================
-# PER-MESSAGE TIMER
+# PER-MESSAGE AUTO DELETE
 # ==============================
-@filters.group & ~filters.service
+@app.on_message(filters.group & ~filters.service)
 async def auto_delete_handler(client, message: Message):
     chat_id = message.chat.id
 
-    # If auto-delete not enabled
     if chat_id not in AUTO_DELETE_TIME:
         return
 
     delay = AUTO_DELETE_TIME[chat_id]
 
-    # 🔥 Timer starts NOW for THIS message only
     await asyncio.sleep(delay)
 
     try:
