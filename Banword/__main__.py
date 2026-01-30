@@ -1,26 +1,22 @@
-import asyncio
-import importlib
+import logging
+from dotenv import load_dotenv
 from pyrogram import idle
-from Banword import app  # fixed import
-from Banword.modules import ALL_MODULES
-from config import LOGGER_ID, BOT_USERNAME
+from config import API_ID, API_HASH, BOT_TOKEN
 
-loop = asyncio.get_event_loop()
+from Banword import app  # IMPORTANT: import the SAME app
 
-async def roy_bot():
-    # Import all modules dynamically
-    for all_module in ALL_MODULES:
-        importlib.import_module(f"Banword.modules.{all_module}")
+load_dotenv()
 
-    print("• Bot Started Successfully.")
-    await idle()
-    print("• Don't edit baby, otherwise you get an error: @ProtectronLogs")
+logging.basicConfig(
+    format="[%(levelname)s/%(asctime)s] %(name)s: %(message)s",
+    level=logging.INFO,
+)
 
-    # Send alive message
-    await app.send_message(
-        LOGGER_ID,
-        "**✦ ɪ ᴀᴍ ᴀʟɪᴠᴇ ʙᴀʙʏ.\n\n✦ ᴊᴏɪɴ - @HamsterUpdatess**"
-    )
+def main():
+    app.start()
+    print("✅ Bot started successfully")
+    idle()          # 🔥 THIS LINE WAS MISSING
+    app.stop()
 
 if __name__ == "__main__":
-    loop.run_until_complete(roy_bot())
+    main()
