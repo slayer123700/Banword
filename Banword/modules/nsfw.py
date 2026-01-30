@@ -128,3 +128,104 @@ async def nsfw_watcher(client: Client, message: Message):
 
 
 # --- 4. CORE ENGINE ---
+def check_strict_nsfw(scores: dict) -> tuple[bool, str]:
+    porn = scores.get("porn", 0.0)
+    hentai = scores.get("hentai", 0.0)
+    sexy = scores.get("sexy", 0.0)
+
+    if porn > 0.08: return True, f"Suspicious (Porn {porn*100:.0f}%)"
+    if hentai > 0.15: return True, f"Hentai Detected ({hentai*100:.0f}%)"
+    if sexy > 0.45: return True, f"Explicit Content ({sexy*100:.0f}%)"
+    if (porn + hentai + sexy) > 0.40: return True, "High Risk Content"
+
+    return False, "Safe"
+
+async def process_media_scan(client: Client, message: Message, manual_override: bool = False):
+    media = None
+    file_unique_id = None
+    use_thumbnail = False
+
+    if message.sticker:
+        media = message.sticker
+        file_unique_id = message.sticker.file_unique_id
+        if message.sticker.is_animated or message.sticker.is_video:
+            use_thumbnail = True
+            if not message.sticker.thumbs: return False, None, "No Thumbnail"
+
+    elif message.photo:
+        media = message.photo
+        file_unique_id = message.photo.file_unique_id
+    elif message.document:
+        if message.document.mime_type and "image" in message.document.mime_type:
+            media = message.document
+            file_unique_id = message.document.file_unique_id
+        else: return False, None, "Not Image"
+
+    if not file_unique_id: return False, None, "No ID"
+
+    # CACHE
+    if not manual_override:
+        cached = await get_cached_scan(file_unique_id)
+        if cached:
+            is_nsfw, reason = check_strict_nsfw(cached['data']['scores'])
+            return is_nsfw, cached['data'], f"{reason}"
+
+    # DOWNLOAD & OPTIMIZE
+    try:
+        # Prevent 10MB bombs
+        if hasattr(media, 'file_size') and media.file_size > 10 * 1024 * 1024:
+            return False, None, "Too Large"
+
+        image_stream = None
+        if use_thumbnail:
+            thumb = media.thumbs[-1]
+            image_stream = await client.download_media(thumb.file_id, in_memory=True)
+        else:
+            image_stream = await client.download_media(message, in_memory=True)
+
+        raw_bytes = bytes(image_stream.getbuffer())
+
+        # APPLY SMART OPTIMIZATION HERE
+        image_bytes = optimize_image(raw_bytes)
+
+        if not image_bytes: return False, None, "Download Failed"
+
+    except Exception: return False, None, "Error"
+
+    # API
+    try:
+        session = await get_session()
+        form = aiohttp.FormData()
+        form.add_field('file', image_bytes, filename='scan.jpg', content_type='image/jpeg')
+
+        # 6s Timeout for speed
+        async with session.post(NSFW_API_URL, data=form, timeout=6) as response:
+            if response.status != 200: return False, None, "API Error"
+            scan_data = await response.json()
+    except Exception: return False, None, "Connection Error"
+
+    scores = scan_data.get("scores", {})
+    is_nsfw, reason = check_strict_nsfw(scores)
+    await cache_scan_result(file_unique_id, not is_nsfw, scan_data)
+    return is_nsfw, scan_data, reason
+
+
+async def handle_nsfw_detection(client, message, data, reason):
+    try:
+        await message.delete()
+        score_block = format_scores_ui(data.get("scores", {}))
+
+        text = (
+            f"🔔 NSFW Content Removed\n"
+            f"👤 User: {message.from_user.mention}\n"
+            f"🚨 Reason: {reason}\n"
+            f"<blockquote>\n"
+            f"📊 AI Analysis:\n"
+            f"{score_block}\n"
+            f"</blockquote>\n"
+        )
+        msg = await client.send_message(message.chat.id, text)
+        await asyncio.sleep(15)
+        await msg.delete()
+    except Exception:
+        pass
